@@ -2,7 +2,7 @@
 
 THIS PROJECT IS VERY MUCH A WORK IN PROGRESS!! DO READ THE README TO SEE THE CURRENT STATUS!
 
-Syncopate manages the dynamic assignment and execution of persistent-time projects across a number of devices
+Syncopate manages the dynamic assignment and execution of persistent-time projects across a number of devices, with minimal configuration required.
 
 ## Intended Project Scope
 Nodes: the rack of Raspberry Pis on your desk, they register themselves to the central server, get assignments, and run them
