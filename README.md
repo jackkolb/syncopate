@@ -11,7 +11,7 @@ Manager: the central server that names nodes, assigns tasks, and publishes statu
 
 Controller: a cute GUI you run on your laptop to manage the Nodes, communicates with the Manager
 
-Overall, Nodes are given a list of GitHub projects to sync with and run
+Overall, Nodes are given a list of git projects to sync with and run. I will be using this for GitHub, but you can host your own git server too (GitTea, etc).
 - Nodes read from Manager their project assignments, and send status information back to Manager
 - Controller can see the status of the various devices and projects
 - Controller can add/remove projects (security regarding this will be interesting...)
