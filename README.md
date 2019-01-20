@@ -5,9 +5,9 @@ THIS PROJECT IS VERY MUCH A WORK IN PROGRESS!! DO READ THE README TO SEE THE CUR
 Syncopate manages and syncs a network of devices, to provide an overview of a collection of Raspberry Pis (or other such devices) and manage a number of persistent-time projects in an automated manner. Overall a pretty simple dynamic load balancer for hobbyists!
 
 ## Intended Project Scope
-Nodes: the rack of Raspberry Pis on your desk
+Nodes: the rack of Raspberry Pis on your desk, they register themselves to the central server, get assignments, and run them
 
-Manager: the central server that names nodes, assigns tasks, and publishes status information (hosted on AWS/GCP/elsewhere)
+Manager: the central server that names nodes, assigns tasks, and publishes status information (hosted on AWS/GCP/your garage/elsewhere)
 
 Controller: a cute GUI you run on your laptop to manage the Nodes, communicates with the Manager
 
