@@ -19,6 +19,48 @@ def index():
 def dev_test():
     return str(node_information)
 
+
+
+
+# receives updateinformation from a Node
+@app.route("/node-update", methods=["POST"])
+def node_update():
+    node_access_token = request.form["access-token"]
+    node_name = request.form["name"]
+    project_name = request.form["project-name"]
+    project_url = request.form["project-url"]
+    project_status = request.form["status"]
+    project_disk_usage = request.form["disk-usage"]
+    project_ram_usage = request.form["ram-usage"]
+    project_persistent_variables = request.form["persistent-variables"]
+
+    update_info = ""
+    if node_name not in node_information.keys():
+        update_info = "error: invalid node name"
+    elif node_access_token != node_information[node_name]["access-token"]:
+        update_info = "error: invalid access token"
+    elif project_name not in node_information[node_name]["projects"].keys():
+        update_info = "error: project not assigned to this node"
+    elif project_url not in node_information[node_name]["projects"][project_name]["url"]:
+        update_info = "error: project url incorrect"
+
+    update_result = "success"
+    if update_info != "":
+        update_result = "failure"
+    
+    node_information[node_name]["projects"][project_name]["status"] = project_status
+    node_information[node_name]["projects"][project_name]["disk-usage"] = project_disk_usage
+    node_information[node_name]["projects"][project_name]["ram-usage"] = project_ram_usage
+    node_information[node_name]["projects"][project_name]["persistent-variables"] = project_persistent_variables
+    node_information[node_name]["last-contact"] = datetime.datetime.now().timestamp()
+
+    response = {
+        "update-result": update_result,
+        "update-info": update_info
+    }
+
+    return str(response)
+
 @app.route("/node-initialize", methods=["POST"])
 def node_initialize():
     # node information from the POST request
