@@ -3,8 +3,9 @@ Manager: hosts the status/variable information from Nodes, handles POST requests
 and Controller to collect and distribute information
 '''
 
-from flask import Flask
+from flask import Flask, request
 import utilities
+import os  # to generate the ssl keys
 
 app = Flask(__name__)
 
@@ -13,6 +14,10 @@ node_information = {}
 @app.route("/")
 def index():
     return "Successfully running Syncopate! This is the Manager."
+
+@app.route("/dev")
+def dev_test():
+    return str(node_information)
 
 @app.route("/node-initialize", methods=["POST"])
 def node_initialize():
@@ -31,22 +36,21 @@ def node_initialize():
         return response
 
     # determine the node name
-    current_node_names = List(node_information.keys())
+    current_node_names = node_information.keys()
     node_name = node_preferred_name
     if node_name in current_node_names:
         node_name = utilities.generateNodeName(current_node_names)
-
     # receiving "-1" from the generateNodeName() indicates failure!
     if node_name == "-1":
         response["initialization-result"] = "failure"
         response["failure-reasoning"] = "unable to generate a node name"
-        return response
+        return str(response)
 
     # everything checks out!
     # generate the node
     node_information[node_name] = utilities.generateBaseNode()
     node_information[node_name]["name"] = node_name
-    node_information[node_name]["access-token"] = generateAccessToken()
+    node_information[node_name]["access-token"] = utilities.generateAccessToken()
     node_information[node_name]["storage"] = storage_available
     node_information[node_name]["ram"] = ram_available
     
@@ -55,6 +59,8 @@ def node_initialize():
     response["name"] = node_name
     response["access-token"] = node_information[node_name]["access-token"]
 
-    return response
+    return str(response)
 
-app.run()
+if __name__ == "__main__":
+    app.run()
+
