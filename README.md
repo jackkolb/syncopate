@@ -48,7 +48,7 @@ When Nodes are activated, they initialize themselves with the Manager via "/node
     "access-token": ACCESS_TOKEN  # randomly generated access token for the Node
 }
 
-Manager will try to give a Node it's preferred name, and the Node will use the assigned name and access-token for its requests.
+Manager will try to give a Node its preferred name, and the Node will use the assigned name and access-token for its requests.
 The Node name "-1" is reserved to flag an error in the name generation!
 
 Manager receives project status information from Nodes via "/node-update", each project sends its own status. The POST request from the Node is in the form:
@@ -73,12 +73,25 @@ Manager receives project status information from Nodes via "/node-update", each 
     "update-info": OTHER_INFORMATION  # other information of the request: if success: nothing, if failure/invalid: error information
 }
 
+To start a project, Manager seeks the most available node. Manager cycles through all the nodes, finds the one that can fit the project and is using the least disk usage
+
+
+
 Manager stores Node information in a dictionary object, restarting Manager will restart all Nodes
+"node name" : {
+    "status": "good",
+    "projects": {
+        "project1": {
+            "url": 
+        }
+    }
+}
+
 
 Manager posts information to Controller via "/controller". The POST request from the Controller is in the form:
 {
-    "access-token": MANAGER_ACCESS_TOKEN,  # randomly generated upon manager start
-    "action": ACTION,  # command for the Manager: start, restart, stop, status, add, remove
+    "access-token": MANAGER_ACCESS_TOKEN,  # controller access token (randomly generated upon manager start)
+    "action": ACTION,  # command for the Manager: start, restart, stop, status, add, remove, reset
     
     # action:start requires:
     "projects": ["project1", "project2", ...]  # projects to start, an empty list means all projects
@@ -91,6 +104,9 @@ Manager posts information to Controller via "/controller". The POST request from
 
     # action:status requires:
     "projects": ["project1", "project2", ...]  # projects to get statuses on, an empty list means all projects
+
+    # action:reset requires:
+    "projects": ["project1", "project2", ...]  # projects to get reset, which resets persistent variables
 
     # action:add requires:
     "project": {
@@ -108,6 +124,12 @@ Manager posts information to Controller via "/controller". The POST request from
         "name": PROJECT_NAME,  # name of the project
         "url": PROJECT_URL  # url of the project (for confirmation)
     }
+}
+
+... to which Manager responds:
+{
+    "request-status": SUCCESS_OR_FAILURE,
+    "request-information": SUPPLEMENTARY_INFORMATION  # in the event of a failure, otherwise left blank
 }
 
 

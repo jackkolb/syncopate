@@ -3,10 +3,40 @@ Manager Utilities: contains several functions to support the server
 '''
 import secrets, string  # for creating the access token
 import random  # for generating node name
+import time
 
-# for dev tests
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+
+node_information = {}
+project_information = {}
+
+# periodically checks if the nodes are alive, if any are dead resort their projects
+def status_check(node_information, projects):
+    while True:
+        for project in projects.keys()
+            if project["node"] == "":
+                max_ram = project
+        
+
+
+# figures out an ideal Node to start the project
+def startProject(projects):
+    for project_name in projects:
+        if project_name not in project_information.keys():
+            continue
+
+        ideal_node = node_information.keys()[0]
+
+        for node_name in node_information.keys():
+            ram = int(node_information[node_name]["ram"])
+            disk = int(node_informatoin[node_name]["disk"]
+            for project in node_information[node_name]["projects"].keys():
+                ram -= node_information[node_name]["projects"][project]["ram"]
+                disk -= node_information[node_name]["projects"][project]["disk"]
+            if project_information[project_name]["ram"] < ram and project_information[project_name]["disk"] < disk:
+                if ram > node_information[ideal_node]["ram"] and disk > node_information[ideal_node]["disk"]:
+                    ideal_node = node_name
+
+        node_information[ideal_node]["projects"][project_name] = project_information[project]
 
 # generates a random alphanumeric string of a specified length
 def generateAlphaNumericString(length):
