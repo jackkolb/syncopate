@@ -23,7 +23,35 @@ None yet!
 ## Structure
 
 ### Node
+Node is one of numerous task-running computers. Nodes query Manager regarding their name, projects, etc via a POST
+request to /node-status of the form:
+{
+    "name": NODE_NAME,
+    "access-token": ACCESS_TOKEN
+}
 
+... to which the Manager responds:
+{
+    "name": NODE_NAME,
+    "projects": {
+        "project 1": {
+            "project-name": NAME_OF_THE_PROJECT,  # the git project name
+            "project-url": URL_OF_THE_PROJECT,  # the url of the project (for confirmation)
+            "status": STATUS,  # good or bad
+            "disk-usage": DISK_USAGE,  # amount of disk space the project is using (for stats for the manager's future project allocation)
+            "ram-usage": RAM_USAGE,  # amount of RAM the project is using (for stats for the manager's future project allocation)
+            "persistent-variables": {  # variables the server should store in case of node realignment, done as a Dictionary
+                "var1": ...,
+                "var2": ...,
+                "var3": ...
+            }
+        },
+        "project 2": {
+            ...
+        },
+        ...
+    }
+}
 
 ### Manager
 Manager is a python webserver (using Flask) that hosts the status information of the nodes. Statuses are updated via POST requests from Nodes, and retrieved via POST requests from Controller. Nodes are independent in posting their statuses to Manager, hence the project name Syncopation. After a defined timeout Manager will declare a Node dead and reassign its tasks.
@@ -51,7 +79,7 @@ When Nodes are activated, they initialize themselves with the Manager via "/node
 Manager will try to give a Node its preferred name, and the Node will use the assigned name and access-token for its requests.
 The Node name "-1" is reserved to flag an error in the name generation!
 
-Manager receives project status information from Nodes via "/node-update", each project sends its own status. The POST request from the Node is in the form:
+Manager receives project status information from Nodes via "/node-update". The POST request from the Node is in the form:
 {
     "access-token": NODE_SPECIFIC_ACCESS_TOKEN,  # randomly generated upon node assignment
     "name": NAME_OF_THE_NODE,  # determined beforehand, possible names can be configured
@@ -73,11 +101,9 @@ Manager receives project status information from Nodes via "/node-update", each 
     "update-info": OTHER_INFORMATION  # other information of the request: if success: nothing, if failure/invalid: error information
 }
 
+
 To start a project, Manager seeks the most available node. Manager cycles through all the nodes, finds the one that can fit the project and is using the least disk usage
 Controller sends a new project to Manager by:
-{
-
-}
 
 
 Manager stores Node information in a dictionary object, restarting Manager will restart all Nodes
@@ -99,7 +125,7 @@ Manager stores Node information in a dictionary object, restarting Manager will 
 }
 
 
-Manager posts information to Controller via "/controller". The POST request from the Controller is in the form:
+Controller posts information to Manager via "/controller". The POST request from the Controller is in the form:
 {
     "access-token": MANAGER_ACCESS_TOKEN,  # controller access token (randomly generated upon manager start)
     "action": ACTION,  # command for the Manager: start, restart, stop, status, add, remove, reset

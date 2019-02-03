@@ -5,6 +5,7 @@ import secrets, string  # for creating the access token
 import random  # for generating node name
 import time
 import datetime
+import ast
 
 node_information = {}
 project_information = {}
@@ -17,6 +18,11 @@ def getSettings():
         settings["server-password"] = lines[0]
     return
 
+def getProjects():
+    with open("manager.projects", "r") as projects_file:
+        project_information = ast.literal_eval(projects_file.readline())
+    return
+    
 # periodically checks if the nodes are alive, if any are dead start them
 def status_check():
     while True:
@@ -36,7 +42,8 @@ def status_check():
             project_information[project]["status"] = "alive"
             project_information[project]["ram"] = current_ram
             project_information[project]["disk"] = current_disk
-
+        with open("manager.projects", "w") as projects_file:
+            projects_file.write(str(project_information))
         time.sleep(3)
     return
 

@@ -13,33 +13,52 @@ import ast
 projects = {}
 settings = {}
 
+node_name = ""
+access_token = ""
+
 def main():
     getSettings()
     initialize()
     while True:
         time.sleep(5)
-        
+        getNodeInformation()
+        print(projects)
     return
 
 
 # updates the manager with project information
-def updateNode():
+def updateManager():
     
     return
 
 
+# request node information
+def getNodeInformation():
+    data = {
+        "name": node_name,
+        "access-token": access_token
+    }
+    response = postRequest("node-status", data)
+    global projects
+    projects = ast.literal_eval(response)
+    return
+
 # sends initialization request to the manager
 def initialize():
-    route = "node-initialize"
     data = {}
     data["preferred-name"] = settings["preferred-name"]
     data["syncopate-password"] = settings["syncopate-password"]
     data["storage"] = getAvailableStorage()
     data["ram"] = getAvailableRam()
-    manager_response = postRequest(route, data)
+    manager_response = postRequest("node-initialize", data)
     manager_response = ast.literal_eval(manager_response)
     if manager_response["initialization-result"] == "success":
-        print("Registered Node")
+        global node_name, access_token
+        node_name = manager_response["name"]
+        access_token = manager_response["access-token"]
+        print("Successfully registered as a node")
+        print("Name: " + node_name)
+        print("Token: " + access_token)
     else:
         print("Failed to register Node: " + manager_response["failure-reasoning"])
     return

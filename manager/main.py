@@ -105,6 +105,30 @@ def node_update():
     return str(response)
 
 
+# request node information for a Node
+@app.route("/node-status", methods=["POST"])
+def node_status():
+    node_access_token = request.form["access-token"]
+    node_name = request.form["name"]
+
+    if node_access_token != utilities.node_information[node_name]["access-token"]:
+        return "Invalid access token"
+
+    projects = utilities.node_information[node_name]["projects"]
+
+    # remove information unnecesary to the node
+    for project_name in projects:
+        del projects[project_name]["status"]
+        del projects[project_name]["disk-usage"]
+        del projects[project_name]["ram-usage"]
+
+    response = {
+        "name": node_name,
+        "projects": projects
+    }
+
+    return str(response)
+
 @app.route("/node-initialize", methods=["POST"])
 def node_initialize():
     # node information from the POST request
@@ -149,6 +173,7 @@ def node_initialize():
 
 if __name__ == "__main__":
     utilities.getSettings()
+    utilities.getProjects()
     manager_thread = threading.Thread(target=utilities.status_check, args=[])
     manager_thread.start()
     app.run()
