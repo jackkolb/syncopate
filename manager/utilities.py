@@ -4,22 +4,52 @@ Manager Utilities: contains several functions to support the server
 import secrets, string  # for creating the access token
 import random  # for generating node name
 import time
-
+import datetime
 
 node_information = {}
 project_information = {}
+active_projects = {}
+settings = {}
 
-# periodically checks if the nodes are alive, if any are dead resort their projects
-def status_check(node_information, projects):
+def getSettings():
+    with open("manager.settings", "r") as settings_file:
+        lines = settings_file.readlines()
+        settings["server-password"] = lines[0]
+    return
+
+# periodically checks if the nodes are alive, if any are dead start them
+def status_check():
     while True:
-        for project in projects.keys()
-            if project["node"] == "":
-                max_ram = project
-        
+        for project in active_projects.keys():
+            # check the timestamp, compare to the timeout
+            last_checkin = active_projects[project]["last-checkin"]
+            timeout = active_projects[project]["timeout"]
+            if datetime.datetime.now().timestamp() > int(last_checkin) + int(timeout):
+                active_projects[project]["status"] = "dead"
+                stopProjects([project])
+                startProjects([project])
+                continue
+
+            current_ram = active_projects[project]["ram"]
+            current_disk = active_projects[project]["disk"]
+
+            project_information[project]["status"] = "alive"
+            project_information[project]["ram"] = current_ram
+            project_information[project]["disk"] = current_disk
+
+        time.sleep(3)
+    return
+
+def stopProjects(projects):
+    for project_name in projects:
+        for node in node_information.keys():
+            if project_name in node["projects"]:
+                projects.remove(project_name)
+    return
 
 
-# figures out an ideal Node to start the project
-def startProject(projects):
+# figures out an ideal Node to start the project, adds to node information
+def startProjects(projects):
     for project_name in projects:
         if project_name not in project_information.keys():
             continue
@@ -28,7 +58,7 @@ def startProject(projects):
 
         for node_name in node_information.keys():
             ram = int(node_information[node_name]["ram"])
-            disk = int(node_informatoin[node_name]["disk"]
+            disk = int(node_information[node_name]["disk"])
             for project in node_information[node_name]["projects"].keys():
                 ram -= node_information[node_name]["projects"][project]["ram"]
                 disk -= node_information[node_name]["projects"][project]["disk"]
@@ -37,6 +67,25 @@ def startProject(projects):
                     ideal_node = node_name
 
         node_information[ideal_node]["projects"][project_name] = project_information[project]
+        
+def getStatuses(projects):
+    response = {}
+    for project_name in projects:
+        response[project_name] = "unknown"
+        for node in node_information.keys():
+            if project_name in node["projects"]:
+                response[project_name] = node["projects"][project_name]["status"]
+    return response
+
+def addProjects(projects):
+    for project_name in projects.keys():
+        project_information[project_name] = projects[project_name] 
+    return
+
+def removeProjects(projects):
+    for project_name in projects:
+        del project_information[project_name]
+    return
 
 # generates a random alphanumeric string of a specified length
 def generateAlphaNumericString(length):

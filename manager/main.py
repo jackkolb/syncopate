@@ -7,7 +7,8 @@ from flask import Flask, request
 import utilities
 import os  # to generate the ssl keys
 import threading
- 
+import datetime
+
 app = Flask(__name__)
 
 
@@ -19,7 +20,7 @@ def index():
 def dev_test():
     return str(utilities.node_information)
 
-# requests node information
+# receives a command from a controller
 @app.route("/controller", methods=["POST"])
 def controller():
     controller_access_token = request.form["access-token"]
@@ -27,16 +28,41 @@ def controller():
     response = {}
 
     valid_actions = ["start", "stop", "restart", "status", "add", "remove"]
-    if action not in valid actions:
+    if action not in valid_actions:
         response["request-status"] = "failure"
         response["request-information"] = "invalid action"
         return str(response)
 
-    if action == "start":
+    elif action == "start":
         projects = dict(request.form["projects"])
-        utilities.startProject(projects) 
+        utilities.startProjects(projects) 
+        return str("success")
 
+    elif action == "stop":
+        projects = dict(request.form["projects"])
+        utilities.stopProjects(projects)
+        return str("success")
 
+    elif action == "restart":
+        projects = dict(request.form["projects"])
+        utilities.stopProjects(projects)
+        utilities.startProjects(projects)
+        return str("success")
+
+    elif action == "status":
+        projects = dict(request.form["projects"])
+        response = utilities.getStatuses(projects)
+        return response
+
+    elif action == "add":
+        projects = dict(request.form["projects"])
+        utilities.addProjects(projects)
+        return str("success")
+
+    elif action == "remove":
+        projects = dict(request.form["projects"])
+        utilities.removeProjects(projects)
+        return str("success")
 
 
 # receives update information from a Node
@@ -78,6 +104,7 @@ def node_update():
 
     return str(response)
 
+
 @app.route("/node-initialize", methods=["POST"])
 def node_initialize():
     # node information from the POST request
@@ -89,10 +116,10 @@ def node_initialize():
     response = {}  # POST response from the Manager
     
     # check password
-    if syncopate_password != "qwerty":
+    if syncopate_password != utilities.settings["server-password"]:
         response["initialization-result"] = "failure"
         response["failure-reasoning"] = "incorrect syncopate password"
-        return response
+        return str(response)
 
     # determine the node name
     current_node_names = utilities.node_information.keys()
@@ -121,7 +148,7 @@ def node_initialize():
     return str(response)
 
 if __name__ == "__main__":
-    manager_thread = thread.Thread(target= utilities.status_check(), args=[utilities.node_information, projects])
-
+    utilities.getSettings()
+    manager_thread = threading.Thread(target=utilities.status_check, args=[])
+    manager_thread.start()
     app.run()
-

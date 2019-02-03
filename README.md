@@ -74,7 +74,10 @@ Manager receives project status information from Nodes via "/node-update", each 
 }
 
 To start a project, Manager seeks the most available node. Manager cycles through all the nodes, finds the one that can fit the project and is using the least disk usage
+Controller sends a new project to Manager by:
+{
 
+}
 
 
 Manager stores Node information in a dictionary object, restarting Manager will restart all Nodes
@@ -82,7 +85,15 @@ Manager stores Node information in a dictionary object, restarting Manager will 
     "status": "good",
     "projects": {
         "project1": {
-            "url": 
+            "status": "project status"  # is the project process still alive
+            "url": "https://...",
+            "ram": "ram usage",
+            "disk": "disk usage",
+            "persistent-variables": {
+                "var1": "...",
+                "var2": "...",
+                "var3": "..."
+            }
         }
     }
 }
