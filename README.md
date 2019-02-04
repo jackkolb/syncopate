@@ -18,7 +18,30 @@ Nodes are given a list of git projects to sync with and run. I will be using/tes
 - Manager balances projects to devices automatically as devices are added/disconnected
 
 ## Completed Features
-None yet!
+Node:
+- base node process (done)
+- initialize node with manager (done)
+- start a project (done, untested)
+- update project information with the manager (done, untested)
+- request node information from manager (done)
+
+Controller:
+- GUI interface to Manager (not started)
+
+Manager:
+- get project statuses (done, untested)
+- add projects to manager (done, untested)
+- remove projects from manager (done, untested)
+- start projects (done, untested)
+- stop projects (done, untested)
+- restart projects (done, untested)
+
+- initialize nodes (done)
+- get updates from nodes (done, untested)
+- give information to nodes (done)
+
+Examples:
+- sample base project (not started)
 
 ## Structure
 

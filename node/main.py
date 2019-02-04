@@ -103,6 +103,8 @@ def updateManager(project_name):
         "persistent-variables": project_variables
     }
 
+    print(data)
+
     response = postRequest("node-update", data)
     print(response)
     return
