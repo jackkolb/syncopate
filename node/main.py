@@ -9,6 +9,7 @@ import time
 import subprocess
 import psutil
 import ast
+import os
 
 projects = {}
 settings = {}
@@ -22,13 +23,88 @@ def main():
     while True:
         time.sleep(5)
         getNodeInformation()
+        global projects
         print(projects)
+        # see if all the projects have been started, if not start projects that haven't been started yet
+        for project_name in projects.keys():
+            if not checkProjectHasStarted(project_name):
+                startProject(project_name)
+
+            updateManager(project_name)  # update the Manager on each project
+
+
     return
 
 
+def checkProjectHasStarted(project_name):
+    if "process" not in projects[project_name].keys() or projects[project_name]["process"] == "":
+        return False
+    return True
+
+
+def checkProjectIsAlive(project_name):
+    if projects[project_name]["process"].poll() == None:
+        return True
+    return False
+
+
+# returns disk usage of a project, in KB
+def getProjectDiskUsage(project_name):
+    total_size = 0
+    seen = set()
+
+    for dirpath, dirnames, filenames in os.walk("./" + project_name):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            try:
+                stat = os.stat(fp)
+            except OSError:
+                continue
+            if stat.st_ino in seen:
+                continue
+            seen.add(stat.st_ino)
+            total_size += stat.st_size
+    return total_size / 1024
+
+
+def getProjectRamUsage(project_name):
+    return psutil.Process(projects[project_name]["process"].pid).memory_info
+
+
+def getProjectVariables(project_name):
+    with open("./" + project_name + "/project.variables", "r") as variables_file:
+        data = ast.literal_eval(variables_file.readline())
+    return data
+
+
+def startProject(project_name):
+    print("Cloning git URL for project " + project_name)
+    git_clone = subprocess.Popen(["git", "clone", projects[project_name]["project-url"], project_name])
+    git_clone.wait()
+    print("Starting project" + project_name)
+    projects[project_name]["process"] = subprocess.Popen(["./" + project_name + "/run.sh"])
+
+
 # updates the manager with project information
-def updateManager():
-    
+def updateManager(project_name):
+    project = projects[project_name]
+    project_url = project["project-url"]
+    project_status = "Alive" if checkProjectIsAlive(project_name) else "Dead"
+    project_disk_usage = getProjectDiskUsage(project_name)
+    project_variables = getProjectVariables(project_name)
+    data = {
+        "access-token": access_token,
+        "name": node_name,
+        "project-name": project_name,
+        "project-url": project_url,  # for confirmation
+        "status": project_status,
+        "disk-usage": project_disk_usage,
+        "ram-usage": getProjectRamUsage,
+        "persistent-variables": project_variables
+    }
+
+    response = postRequest("node-update", data)
+    print(response)
     return
 
 

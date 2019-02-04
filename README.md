@@ -23,7 +23,7 @@ None yet!
 ## Structure
 
 ### Node
-Node is one of numerous task-running computers. Nodes query Manager regarding their name, projects, etc via a POST
+Node is one of numerous task-running computers. Nodes periodically query Manager regarding their name, projects, etc via a POST
 request to /node-status of the form:
 {
     "name": NODE_NAME,
@@ -51,6 +51,31 @@ request to /node-status of the form:
         },
         ...
     }
+}
+
+Node will periodically update Manager with information about projects. Projects will store persistent variables in a "project.variables" file in their base directory (through writing a string representation of a dictionary), which will be
+collected by the Node and sent to the Manager in the project status information.
+
+Node updates Manager via a POST request to the /node-update route:
+{
+    "access-token": ACCESS_TOKEN,
+    "name": NODE_NAME,
+    "project-name": PROJECT_NAME,
+    "project-url": PROJECT_URL,  # for confirmation
+    "status": PROJECT_STATUS,
+    "disk-usage": PROJECT_DISK_USAGE,
+    "ram-usage": PROJECT_RAM_USAGE,
+    "persistent-variables": {
+        "var1": ...,
+        "var2": ...,
+        "var3": ...
+    }
+}
+
+... to which Manager responds:
+{
+    "update-result": "success"  # or "failure"
+    "update-info": "" # or failure information (invalid access token, mismatch project information, etc)
 }
 
 ### Manager
