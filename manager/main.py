@@ -8,6 +8,7 @@ import utilities
 import os  # to generate the ssl keys
 import threading
 import datetime
+import logging
 
 app = Flask(__name__)
 
@@ -65,7 +66,7 @@ def controller():
         return str("success")
 
 
-# receives update information from a Node
+# handler to receive project update information from a Node
 @app.route("/node-update", methods=["POST"])
 def node_update():
     node_access_token = request.form["access-token"]
@@ -73,8 +74,8 @@ def node_update():
     project_name = request.form["project-name"]
     project_url = request.form["project-url"]
     project_status = request.form["status"]
-    project_disk_usage = request.form["disk-usage"]
-    project_ram_usage = request.form["ram-usage"]
+    project_disk_usage = request.form["project-storage"]
+    project_ram_usage = request.form["project-ram"]
     project_persistent_variables = request.form["persistent-variables"]
 
     update_info = ""
@@ -84,28 +85,31 @@ def node_update():
         update_info = "error: invalid access token"
     elif project_name not in utilities.node_information[node_name]["projects"].keys():
         update_info = "error: project not assigned to this node"
-    elif project_url not in utilities.node_information[node_name]["projects"][project_name]["url"]:
+    elif project_url not in utilities.node_information[node_name]["projects"][project_name]["project-url"]:
         update_info = "error: project url incorrect"
 
     update_result = "success"
     if update_info != "":
         update_result = "failure"
+
     
     utilities.node_information[node_name]["projects"][project_name]["status"] = project_status
-    utilities.node_information[node_name]["projects"][project_name]["disk-usage"] = project_disk_usage
-    utilities.node_information[node_name]["projects"][project_name]["ram-usage"] = project_ram_usage
+    utilities.node_information[node_name]["projects"][project_name]["project-storage"] = project_disk_usage
+    utilities.node_information[node_name]["projects"][project_name]["project-ram"] = project_ram_usage
     utilities.node_information[node_name]["projects"][project_name]["persistent-variables"] = project_persistent_variables
-    utilities.node_information[node_name]["last-contact"] = datetime.datetime.now().timestamp()
+    utilities.active_projects[project_name]["last-contact"] = datetime.datetime.now().timestamp()
 
     response = {
         "update-result": update_result,
         "update-info": update_info
     }
 
+    print("Received update information from node: " + node_name)
+
     return str(response)
 
 
-# request node information for a Node
+# handlers for nodes to request their own project information
 @app.route("/node-status", methods=["POST"])
 def node_status():
     node_access_token = request.form["access-token"]
@@ -116,19 +120,17 @@ def node_status():
 
     projects = utilities.node_information[node_name]["projects"]
 
-    # remove information unnecesary to the node
-    for project_name in projects:
-        del projects[project_name]["status"]
-        del projects[project_name]["disk-usage"]
-        del projects[project_name]["ram-usage"]
-
     response = {
         "name": node_name,
         "projects": projects
     }
 
+    print("Gave status information to node: " + node_name)
+
     return str(response)
 
+
+# handler for nodes to initialize themselves
 @app.route("/node-initialize", methods=["POST"])
 def node_initialize():
     # node information from the POST request
@@ -168,7 +170,7 @@ def node_initialize():
     response["initialization-result"] = "success"
     response["name"] = node_name
     response["access-token"] = utilities.node_information[node_name]["access-token"]
-
+    print("Registered new node: " + node_name)
     return str(response)
 
 if __name__ == "__main__":
@@ -176,4 +178,7 @@ if __name__ == "__main__":
     utilities.getProjects()
     manager_thread = threading.Thread(target=utilities.status_check, args=[])
     manager_thread.start()
+    app.logger.disabled = True
+    log = logging.getLogger('werkzeug')
+    log.disabled = True
     app.run()

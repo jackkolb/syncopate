@@ -104,6 +104,20 @@ Node updates Manager via a POST request to the /node-update route:
 ### Manager
 Manager is a python webserver (using Flask) that hosts the status information of the nodes. Statuses are updated via POST requests from Nodes, and retrieved via POST requests from Controller. Nodes are independent in posting their statuses to Manager, hence the project name Syncopation. After a defined timeout Manager will declare a Node dead and reassign its tasks.
 
+Manager internally stores projects in the following format:
+{
+    "project-name": {
+        "project-url": someurl,
+        "disk-estimate": diskestimate,
+        "ram-estimate": ramestimate,
+        "persistent-variables": {
+            "var1": ...,
+            "var2": ...,
+            "var3": ...
+        }
+    }
+}
+
 When Nodes are activated, they initialize themselves with the Manager via "/node-initialize". The POST request from the Node is in the form:
 {
     "preferred-name": PREFERRED_NAME,  # preferred name of the Node, otherwise one will be assigned to it

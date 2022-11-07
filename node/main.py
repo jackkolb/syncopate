@@ -10,29 +10,35 @@ import subprocess
 import psutil
 import ast
 import os
+import atexit
+import signal
 
-projects = {}
 settings = {}
+projects = {}
 
 node_name = ""
 access_token = ""
+
+def exit_handler():
+    for project_name in projects.keys():
+        print(projects[project_name])
+        try:
+            os.kill(projects[project_name]["process"].pid, signal.SIGTERM)
+        except:
+            pass
 
 def main():
     getSettings()
     initialize()
     while True:
-        time.sleep(5)
         getNodeInformation()
-        global projects
-        print(projects)
         # see if all the projects have been started, if not start projects that haven't been started yet
         for project_name in projects.keys():
             if not checkProjectHasStarted(project_name):
                 startProject(project_name)
 
             updateManager(project_name)  # update the Manager on each project
-
-
+        time.sleep(5)
     return
 
 
@@ -41,7 +47,6 @@ def checkProjectHasStarted(project_name):
         return False
     return True
 
-
 def checkProjectIsAlive(project_name):
     if projects[project_name]["process"].poll() == None:
         return True
@@ -49,7 +54,7 @@ def checkProjectIsAlive(project_name):
 
 
 # returns disk usage of a project, in KB
-def getProjectDiskUsage(project_name):
+def getProjectStorage(project_name):
     total_size = 0
     seen = set()
 
@@ -64,25 +69,34 @@ def getProjectDiskUsage(project_name):
                 continue
             seen.add(stat.st_ino)
             total_size += stat.st_size
-    return total_size / 1024
+    return int(total_size / 1024)
 
 
+# memory usage, MB
 def getProjectRamUsage(project_name):
-    return psutil.Process(projects[project_name]["process"].pid).memory_info
+    return int(psutil.Process(projects[project_name]["process"].pid).memory_info().rss / 1000)
 
 
 def getProjectVariables(project_name):
-    with open("./" + project_name + "/project.variables", "r") as variables_file:
-        data = ast.literal_eval(variables_file.readline())
+    try:
+        with open("./" + project_name + "/project.variables", "r") as variables_file:
+            data = ast.literal_eval(variables_file.readline())
+    except FileNotFoundError:
+        data = {}
     return data
 
 
 def startProject(project_name):
-    print("Cloning git URL for project " + project_name)
-    git_clone = subprocess.Popen(["git", "clone", projects[project_name]["project-url"], project_name])
+    global projects
+    print("[info] starting project: " + project_name)
+    remove_existing = subprocess.Popen(["rm", "-Rf", projects[project_name]["project-url"], "./projects/" + project_name])
+    remove_existing.wait()
+    DEVNULL = open(os.devnull, 'w')
+    git_clone = subprocess.Popen(["git", "clone", projects[project_name]["project-url"], "./projects/" + project_name], stdout=DEVNULL, stderr=subprocess.STDOUT)
     git_clone.wait()
-    print("Starting project" + project_name)
-    projects[project_name]["process"] = subprocess.Popen(["./" + project_name + "/run.sh"])
+    subprocess.Popen(["chmod", "+x", "./projects/" + project_name + "/run.sh"])
+    projects[project_name]["process"] = subprocess.Popen(["sh", "./projects/" + project_name + "/run.sh"])
+    print("[info] project started: " + project_name)
 
 
 # updates the manager with project information
@@ -90,7 +104,7 @@ def updateManager(project_name):
     project = projects[project_name]
     project_url = project["project-url"]
     project_status = "Alive" if checkProjectIsAlive(project_name) else "Dead"
-    project_disk_usage = getProjectDiskUsage(project_name)
+    project_storage = getProjectStorage(project_name)
     project_variables = getProjectVariables(project_name)
     data = {
         "access-token": access_token,
@@ -98,15 +112,12 @@ def updateManager(project_name):
         "project-name": project_name,
         "project-url": project_url,  # for confirmation
         "status": project_status,
-        "disk-usage": project_disk_usage,
-        "ram-usage": getProjectRamUsage,
+        "project-storage": project_storage,
+        "project-ram": getProjectRamUsage(project_name),
         "persistent-variables": project_variables
     }
 
-    print(data)
-
     response = postRequest("node-update", data)
-    print(response)
     return
 
 
@@ -117,8 +128,21 @@ def getNodeInformation():
         "access-token": access_token
     }
     response = postRequest("node-status", data)
+    response = ast.literal_eval(response)
+
+    #print("[Node Information] " + str(response))
+
+    if response["name"] != node_name:
+        print("[error] /node-status failure: receive incorrect name in Manager response")
+        return
+
     global projects
-    projects = ast.literal_eval(response)
+    response_projects = response["projects"]
+    for project_name in projects.keys():
+        if "process" in projects[project_name].keys():
+            response_projects[project_name]["process"] = projects[project_name]["process"]
+
+    projects = response_projects
     return
 
 # sends initialization request to the manager
@@ -134,14 +158,10 @@ def initialize():
         global node_name, access_token
         node_name = manager_response["name"]
         access_token = manager_response["access-token"]
-        print("Successfully registered as a node")
-        print("Name: " + node_name)
-        print("Token: " + access_token)
+        print("[info] successfully registered as a node: " + node_name)
     else:
-        print("Failed to register Node: " + manager_response["failure-reasoning"])
+        print("[error] failed to register node: " + manager_response["failure-reasoning"])
     return
-
-
 
 
 def postRequest(route, data):
@@ -171,10 +191,18 @@ def getAvailableStorage():
     df = subprocess.Popen(["df", "/"], stdout=subprocess.PIPE)
     output = str(df.communicate()[0]).split("\\n")[1].split(" ")
     output = [x for x in output if x != ""][3]
-    output = int(int(output)/1048576*1000)/1000
+    output = int(int(output)/1048576)
     return output 
 
 
+def checkproc(project_name):
+    if "process" in projects[project_name].keys():
+        return "true"
+    return "false"
+    
+
+
 if __name__ == "__main__":
+    atexit.register(exit_handler)
     main()
     
