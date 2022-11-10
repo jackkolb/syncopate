@@ -26,7 +26,7 @@ Node:
 - request node information from manager (done)
 - pass given environment variables to the subprocess (done)
 - reinitializes on manager reset (done)
-- update from git changes
+- update from git changes (done)
 
 Controller:
 - GUI interface to Manager (in progress)

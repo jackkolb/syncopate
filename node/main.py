@@ -122,7 +122,7 @@ def startProject(project_name):
     remove_existing.wait()
     DEVNULL = open(os.devnull, 'w')
     # clone the git repo
-    git_clone = subprocess.Popen(["git", "clone", projects[project_name]["project-url"], "./projects/" + project_name], stdout=DEVNULL, stderr=subprocess.STDOUT)
+    git_clone = subprocess.Popen(["git", "clone", projects[project_name]["project-url"], "./projects/" + project_name], stderr=subprocess.STDOUT)
     git_clone.wait()
     # open the process
     subprocess.Popen(["chmod", "+x", "./projects/" + project_name + "/run.sh"])
