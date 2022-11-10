@@ -79,20 +79,31 @@ def node_update():
     project_ram_usage = request.form["project-ram"]
     project_persistent_variables = request.form["persistent-variables"]
 
+    response = {}
+
     update_info = ""
     if node_name not in utilities.node_information.keys():
-        update_info = "error: invalid node name"
+        response["code"] = 100
+        response["failure-reasoning"] = "invalid node name"
+        return jsonify(response)
     elif node_access_token != utilities.node_information[node_name]["access-token"]:
         update_info = "error: invalid access token"
+        response["code"] = 101
+        response["failure-reasoning"] = "invalid access token"
+        return jsonify(response)
     elif project_name not in utilities.node_information[node_name]["projects"].keys():
-        update_info = "error: project not assigned to this node"
+        response["code"] = 102
+        response["failure-reasoning"] = "project not assigned to this node"
+        return jsonify(response)
     elif project_url not in utilities.node_information[node_name]["projects"][project_name]["project-url"]:
-        update_info = "error: project url incorrect"
+        response["code"] = 103
+        response["failure-reasoning"] = "incorrect project url"
+        return jsonify(response)
 
     update_result = "success"
     if update_info != "":
         update_result = "failure"
-    
+        
     utilities.node_information[node_name]["projects"][project_name]["status"] = project_status
     utilities.node_information[node_name]["projects"][project_name]["project-storage"] = project_disk_usage
     utilities.node_information[node_name]["projects"][project_name]["project-ram"] = project_ram_usage
@@ -103,7 +114,7 @@ def node_update():
     utilities.node_information[node_name]["last-contact"] = timestamp
 
     response = {
-        "code": 200,
+        "code": 0,
         "update-result": update_result,
         "update-info": update_info
     }
@@ -119,13 +130,25 @@ def node_status():
     node_access_token = request.form["access-token"]
     node_name = request.form["name"]
 
+    # if the node name does not exist, return that it's invalid (node will reinitialize)
+    if node_name not in utilities.node_information:
+        response = {
+            "code": 100,
+            "failure-reasoning": "node name does not exist"
+        }
+        return jsonify(response)
+
     if node_access_token != utilities.node_information[node_name]["access-token"]:
-        return "Invalid access token"
+        response = {
+            "code": 11,
+            "failure-reasoning": "incorrect access token"
+        }
+        return jsonify(response)
 
     projects = utilities.node_information[node_name]["projects"]
 
     response = {
-        "code": 200,
+        "code": 0,
         "name": node_name,
         "projects": projects
     }

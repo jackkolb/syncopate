@@ -21,33 +21,36 @@ Nodes are given a list of git projects to sync with and run. I will be using/tes
 Node:
 - base node process (done)
 - initialize node with manager (done)
-- start a project (done, untested)
-- update project information with the manager (done, untested)
+- start a project (done)
+- update project information with the manager (done)
 - request node information from manager (done)
+- pass given environment variables to the subprocess (done)
+- reinitializes on manager reset (done)
+- update from git changes
 
 Controller:
-- GUI interface to Manager (not started)
+- GUI interface to Manager (in progress)
+- get project statuses (functionally done)
+- add projects to manager (functionally done, untested)
+- remove projects from manager (functionally done, untested)
+- start projects (functionally done, untested)
+- stop projects (functionally done, untested)
+- restart projects (functionally done, untested)
 
 Manager:
-- get project statuses (done, untested)
-- add projects to manager (done, untested)
-- remove projects from manager (done, untested)
-- start projects (done, untested)
-- stop projects (done, untested)
-- restart projects (done, untested)
-
 - initialize nodes (done)
-- get updates from nodes (done, untested)
+- get updates from nodes (done)
 - give information to nodes (done)
+- reassign projects on node exit/timeout (done)
 
 Examples:
-- sample base project (not started)
+- sample base project (done: https://github.com/jackkolb/simple-project)
 
 ## Structure
 
+
 ### Node
-Node is one of numerous task-running computers. Nodes periodically query Manager regarding their name, projects, etc via a POST
-request to /node-status of the form:
+Node is one of the task-running computers. Nodes periodically query Manager regarding their name, projects, etc via a POST request to /node-status. The request uses the form:
 {
     "name": NODE_NAME,
     "access-token": ACCESS_TOKEN
@@ -63,10 +66,15 @@ request to /node-status of the form:
             "status": STATUS,  # good or bad
             "disk-usage": DISK_USAGE,  # amount of disk space the project is using (for stats for the manager's future project allocation)
             "ram-usage": RAM_USAGE,  # amount of RAM the project is using (for stats for the manager's future project allocation)
-            "persistent-variables": {  # variables the server should store in case of node realignment, done as a Dictionary
+            "persistent-variables": {  # persistent variables the server should store in case of project reallocation, done as a Dictionary
                 "var1": ...,
                 "var2": ...,
                 "var3": ...
+            },
+            "environment-variables": {  # environment variables that the node should include with the process
+                "var1": ...,
+                "var2": ...,
+                "var3": ...,
             }
         },
         "project 2": {
@@ -76,10 +84,9 @@ request to /node-status of the form:
     }
 }
 
-Node will periodically update Manager with information about projects. Projects will store persistent variables in a "project.variables" file in their base directory (through writing a string representation of a dictionary), which will be
-collected by the Node and sent to the Manager in the project status information.
+Node will periodically update Manager with information about projects. Projects will store persistent variables in a "project.variables" file in their base directory (through writing a stringified dictionary), which will be collected by the Node and sent to the Manager in the project status information.
 
-Node updates Manager via a POST request to the /node-update route:
+Node periodically updates Manager via a POST request to the /node-update route:
 {
     "access-token": ACCESS_TOKEN,
     "name": NODE_NAME,
@@ -110,6 +117,11 @@ Manager internally stores projects in the following format:
         "project-url": someurl,
         "disk-estimate": diskestimate,
         "ram-estimate": ramestimate,
+        "persistent-variables": {
+            "var1": ...,
+            "var2": ...,
+            "var3": ...
+        },
         "persistent-variables": {
             "var1": ...,
             "var2": ...,
@@ -231,6 +243,18 @@ Controller posts information to Manager via "/controller". The POST request from
     "request-information": SUPPLEMENTARY_INFORMATION  # in the event of a failure, otherwise left blank
 }
 
+### Manager Codes
+
+The manager has a number of `code` responses:
+0. Good. No issues.
+
+The 100 series are errors
+100. The given node name does not exist, perhaps the manager reset. Nodes should reinitialize.
+101. Invalid access token, perhaps the manager reset. Nodes should reinitialize.
+102. Project not assigned to this node, perhaps the manager reassigned the project because the node took too long to check in. Nodes should drop the project.
+103. Project URL is incorrect, perhaps the repo was changed by the manager (such as via the controller). Nodes should pull the new project URL.
+
 
 ### Controller
 
+Controller is a web interface to the manager, to visualize node/project states and issue user commands. The UI is currently barely started, but the functionality is mostly present serverside.

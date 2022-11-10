@@ -25,29 +25,48 @@ access_token = ""
 # gracefully exit by killing all processes
 def exit_handler():
     for project_name in projects.keys():
-        print(projects[project_name])
         try:
             os.kill(projects[project_name]["process"].pid, signal.SIGTERM)
         except:
             pass
 
+# kill a given process ID, from https://stackoverflow.com/questions/4789837/
+def kill(proc_pid):
+    process = psutil.Process(proc_pid)
+    for proc in process.children(recursive=True):
+        proc.kill()
+    process.kill()
+
 def main():
-    getSettings()
-
-    # block until node can initialize
-    while not initialize():
-        time.sleep(5)
-
-    # continuously pull node and project information
+    # bootstrap loop
     while True:
-        getNodeInformation()
-        # see if all the projects have been started, if not start projects that haven't been started yet
-        for project_name in projects.keys():
-            if not checkProjectHasStarted(project_name):
-                startProject(project_name)
+        getSettings()
 
-            updateManager(project_name)  # update the Manager on each project
-        time.sleep(5)
+        # block until node can initialize
+        while not initialize():
+            time.sleep(1)
+
+        # continuously pull node and project information
+        while True:
+            code = getNodeInformation()
+
+            # process the code in case it means the node should reinitialize
+            # 100: invalid node name
+            # 101: invalid node access token
+            if code == 100 or code == 101:
+                break
+
+            # see if all the projects have been started, if not start projects that haven't been started yet
+            for project_name in projects.keys():
+                if not checkProjectHasStarted(project_name):
+                    startProject(project_name)
+
+                if pullGit(project_name):  # pull the latest info
+                    killProject(project_name)
+                    continue
+
+                updateManager(project_name)  # update the Manager on each project
+            time.sleep(1)
     return
 
 
@@ -57,7 +76,7 @@ def checkProjectHasStarted(project_name):
     return True
 
 def checkProjectIsAlive(project_name):
-    if projects[project_name]["process"].poll() == None:
+    if projects[project_name]["process"] != "" and projects[project_name]["process"].poll() == None:
         return True
     return False
 
@@ -85,9 +104,8 @@ def getProjectStorage(project_name):
 def getProjectRamUsage(project_name):
     return int(psutil.Process(projects[project_name]["process"].pid).memory_info().rss / 1024 / 1024)
 
-
-# get project variables
-def getProjectVariables(project_name):
+# get project persistent variables
+def getProjectPersistentVariables(project_name):
     try:
         with open("./" + project_name + "/project.variables", "r") as variables_file:
             data = ast.literal_eval(variables_file.readline())
@@ -95,20 +113,37 @@ def getProjectVariables(project_name):
         data = {}
     return data
 
-
 # starts a project
 def startProject(project_name):
     global projects
     print("[info] starting project: " + project_name)
-    remove_existing = subprocess.Popen(["rm", "-Rf", projects[project_name]["project-url"], "./projects/" + project_name])
+    # remove the project if it already exists
+    remove_existing = subprocess.Popen(["rm", "-rf", projects[project_name]["project-url"], "./projects/" + project_name])
     remove_existing.wait()
     DEVNULL = open(os.devnull, 'w')
+    # clone the git repo
     git_clone = subprocess.Popen(["git", "clone", projects[project_name]["project-url"], "./projects/" + project_name], stdout=DEVNULL, stderr=subprocess.STDOUT)
     git_clone.wait()
+    # open the process
     subprocess.Popen(["chmod", "+x", "./projects/" + project_name + "/run.sh"])
-    projects[project_name]["process"] = subprocess.Popen(["sh", "./projects/" + project_name + "/run.sh"])
+    projects[project_name]["process"] = subprocess.Popen(["sh", "./projects/" + project_name + "/run.sh"], env=projects[project_name]["environment-variables"])
     print("[info] project started: " + project_name)
 
+# pulls from git to check for updates
+def pullGit(project_name):
+    # pull the git repo
+    git_pull = subprocess.check_output(["git", "-C", "projects/" + project_name, "pull"])
+    if "changed" in str(git_pull):
+        return True
+    return False
+
+# kills the project
+def killProject(project_name):
+    try:
+        kill(projects[project_name]["process"].pid)
+        projects[project_name]["process"] = ""
+    except Exception as e:
+        print("failed to kill project:", e)
 
 # updates the manager with project information
 def updateManager(project_name):
@@ -116,7 +151,6 @@ def updateManager(project_name):
     project_url = project["project-url"]
     project_status = "alive" if checkProjectIsAlive(project_name) else "dead"
     project_storage = getProjectStorage(project_name)
-    project_variables = getProjectVariables(project_name)
     data = {
         "access-token": access_token,
         "name": node_name,
@@ -125,7 +159,7 @@ def updateManager(project_name):
         "status": project_status,
         "project-storage": project_storage,
         "project-ram": getProjectRamUsage(project_name),
-        "persistent-variables": project_variables
+        "persistent-variables": getProjectPersistentVariables(project_name)
     }
 
     response = postRequest("node-update", data)
@@ -142,24 +176,34 @@ def getNodeInformation():
     }
     response = postRequest("node-status", data)
 
-    if response["code"] != 200:
+    if response["code"] != 0:
         print("[error] error retrieving node status:", response["failure-reasoning"])
-        return
+        return response["code"]
 
     #print("[Node Information] " + str(response))
 
     if response["name"] != node_name:
         print("[error] /node-status failure: receive incorrect name in Manager response")
-        return
+        return response["code"]
 
     global projects
     response_projects = response["projects"]
     for project_name in projects.keys():
+        # if the project is not assigned to this node, drop it
+        if project_name not in response_projects:
+            print("[info] node no longer contains project", project_name, ", killing the project")
+            try:
+                kill(projects[project_name]["process"].pid)
+            except Exception as e:
+                print("except killing process", e)
+                pass
+            del projects[project_name]
+            break
         if "process" in projects[project_name].keys():
             response_projects[project_name]["process"] = projects[project_name]["process"]
 
     projects = response_projects
-    return
+    return response["code"]
 
 # sends initialization request to the manager
 def initialize():

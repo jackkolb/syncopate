@@ -1,1 +1,3 @@
-qwerty
+qwerty # manager password
+10 # node timeout
+10 # project timeout

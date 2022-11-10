@@ -45,11 +45,10 @@ def status_check():
 
         # check if individual nodes are alive
         for node in [x for x in node_information.keys()]:
-            if timestamp - node_information[node]["last-contact"] > 30:
+            if timestamp - node_information[node]["last-contact"] > settings["node-timeout"]:
                 # assume node is dead
                 print("node", node, "is dead")
                 del node_information[node]
-
 
         with open("manager.projects", "w") as projects_file:
             projects_file.write(str(project_information))
@@ -60,7 +59,20 @@ def status_check():
 def getSettings():
     with open("manager.settings", "r") as settings_file:
         lines = settings_file.readlines()
-        settings["server-password"] = lines[0]
+
+        settings["server-password"] = lines[0].split(" ")[0].replace("\n", "")
+
+        node_timeout = lines[1].split(" ")[0].replace("\n", "")
+        if node_timeout.isnumeric():
+            settings["node-timeout"] = int(node_timeout)
+        else:
+            print("invalid format for node-timeout setting, need int")
+
+        project_timeout = lines[2].split(" ")[0].replace("\n", "")
+        if project_timeout.isnumeric():
+            settings["project-timeout"] = int(project_timeout)
+        else:
+            print("invalid format for project-timeout setting, need int")
     return
 
 
@@ -73,7 +85,7 @@ def getProjects():
         for project in active_projects.keys():
             active_projects[project]["status"] = "dead"
             active_projects[project]["last-contact"] = 0
-            active_projects[project]["timeout"] = 30
+            active_projects[project]["timeout"] = settings["project-timeout"]
 
             if "ram-estimate" not in project_information.keys():
                 project_information[project]["ram-estimate"] = 1
@@ -98,24 +110,31 @@ def startProjects(projects):
     if len(node_information.keys()) == 0:
         return
 
+    # start each project
     for project_name in projects:
         if project_name not in project_information.keys():
             print("[info] startProjects project name not in project informations")
             continue
 
+        # find the ideal node to run the project on
         ideal_node = None
         print("Starting project", project_name, node_information)
 
+        # for each possible node
         for node_name in node_information.keys():
+            # get the available RAM and disk
             ram = int(node_information[node_name]["ram"])
             disk = int(node_information[node_name]["storage"])
             for project in node_information[node_name]["projects"].keys():
                 ram -= int(node_information[node_name]["projects"][project]["project-ram"])
                 disk -= int(node_information[node_name]["projects"][project]["project-storage"])
+            # if the possible node is able to support the project's RAM and disk requirements
             if int(project_information[project_name]["ram-estimate"]) < ram and int(project_information[project_name]["storage-estimate"]) < disk:
+                # set as the ieal node if there is no other node already
                 if ideal_node is None:
                     ideal_node = node_name
-                elif ram > int(node_information[ideal_node]["ram"]) and disk > int(node_information[ideal_node]["storage"]):
+                # set as the ideal node if this node has more available RAM
+                elif ram > int(node_information[ideal_node]["ram"]):
                     ideal_node = node_name
         
         if ideal_node is None:
