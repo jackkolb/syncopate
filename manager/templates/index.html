@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+    <head>
+
+    </head>
+
+    <style>
+        body {
+            user-select: none;
+        }
+    </style>
+
+    <body>
+
+        <div id="status"></div>
+
+        <script>
+            window.setInterval(() => {
+                postRequest({"access-token": "123abc", "action": "status", "projects": ["simple-project"]})
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById("status").innerHTML = JSON.stringify(data);
+                })
+                
+            }, 1000)
+
+            function postRequest(data) {
+                return fetch("/controller", {
+                    method: "POST",
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify(data)
+                    })
+            }
+        </script>
+    </body>
+</html>

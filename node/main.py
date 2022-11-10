@@ -4,7 +4,9 @@ Node: periodically requests current assignments from the manager, downloads proj
 
 
 from urllib.parse import urlencode
+import urllib
 from urllib.request import Request, urlopen
+import urllib.error
 import time
 import subprocess
 import psutil
@@ -12,6 +14,7 @@ import ast
 import os
 import atexit
 import signal
+import json
 
 settings = {}
 projects = {}
@@ -19,6 +22,7 @@ projects = {}
 node_name = ""
 access_token = ""
 
+# gracefully exit by killing all processes
 def exit_handler():
     for project_name in projects.keys():
         print(projects[project_name])
@@ -29,7 +33,12 @@ def exit_handler():
 
 def main():
     getSettings()
-    initialize()
+
+    # block until node can initialize
+    while not initialize():
+        time.sleep(5)
+
+    # continuously pull node and project information
     while True:
         getNodeInformation()
         # see if all the projects have been started, if not start projects that haven't been started yet
@@ -74,9 +83,10 @@ def getProjectStorage(project_name):
 
 # memory usage, MB
 def getProjectRamUsage(project_name):
-    return int(psutil.Process(projects[project_name]["process"].pid).memory_info().rss / 1000)
+    return int(psutil.Process(projects[project_name]["process"].pid).memory_info().rss / 1024 / 1024)
 
 
+# get project variables
 def getProjectVariables(project_name):
     try:
         with open("./" + project_name + "/project.variables", "r") as variables_file:
@@ -86,6 +96,7 @@ def getProjectVariables(project_name):
     return data
 
 
+# starts a project
 def startProject(project_name):
     global projects
     print("[info] starting project: " + project_name)
@@ -118,6 +129,8 @@ def updateManager(project_name):
     }
 
     response = postRequest("node-update", data)
+    if response == {}:
+        print("Failed to update manager")
     return
 
 
@@ -128,7 +141,10 @@ def getNodeInformation():
         "access-token": access_token
     }
     response = postRequest("node-status", data)
-    response = ast.literal_eval(response)
+
+    if response["code"] != 200:
+        print("[error] error retrieving node status:", response["failure-reasoning"])
+        return
 
     #print("[Node Information] " + str(response))
 
@@ -153,24 +169,35 @@ def initialize():
     data["storage"] = getAvailableStorage()
     data["ram"] = getAvailableRam()
     manager_response = postRequest("node-initialize", data)
-    manager_response = ast.literal_eval(manager_response)
-    if manager_response["initialization-result"] == "success":
+    if manager_response["code"] == 0:
         global node_name, access_token
         node_name = manager_response["name"]
         access_token = manager_response["access-token"]
         print("[info] successfully registered as a node: " + node_name)
     else:
         print("[error] failed to register node: " + manager_response["failure-reasoning"])
-    return
+        return False
+    return True
 
-
+# send a post request
 def postRequest(route, data):
     url = settings["manager-url"] + "/" + route
-    post_request = Request(url, urlencode(data).encode())
-    response = urlopen(post_request).read().decode()
+    post_request = Request(url, urllib.parse.urlencode(data).encode())
+    try:
+        response = json.load(urlopen(post_request))
+    except urllib.error.URLError:
+        response = {"code": 1, "failure-reasoning": "Unable to locate server"}
+    except ConnectionResetError:
+        response = {"code": 1, "failure-reasoning": "Server died while contacting"}
+
+    # check if dictionary
+    if not isinstance(response, dict):
+        print("Malformed response, not a dictionary.")
+        response = {"code": 4, "failure-reasoning": "Expected a dictionary from the Manager route /" + str(route)}
+
     return response
 
-
+# read the node settings
 def getSettings():
     with open("node.settings", "r") as setup_file:
         lines = setup_file.readlines()

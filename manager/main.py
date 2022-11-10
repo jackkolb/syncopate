@@ -3,67 +3,64 @@ Manager: hosts the status/variable information from Nodes, handles POST requests
 and Controller to collect and distribute information
 '''
 
-from flask import Flask, request
+from flask import Flask, request, jsonify, render_template
 import utilities
 import os  # to generate the ssl keys
 import threading
 import datetime
 import logging
+import json
 
 app = Flask(__name__)
 
 
 @app.route("/")
 def index():
-    return "Successfully running Syncopate! This is the Manager."
+    return render_template("index.html")
 
 @app.route("/dev")
 def dev_test():
-    return str(utilities.node_information)
+    return jsonify(utilities.node_information)
 
 # receives a command from a controller
 @app.route("/controller", methods=["POST"])
 def controller():
-    controller_access_token = request.form["access-token"]
-    action = request.form["action"]
-    response = {}
+    data = json.loads(request.get_data().decode())
+    controller_access_token = data["access-token"]
+    action = data["action"]
+    response = {"code": 0}
 
     valid_actions = ["start", "stop", "restart", "status", "add", "remove"]
     if action not in valid_actions:
         response["request-status"] = "failure"
         response["request-information"] = "invalid action"
-        return str(response)
 
     elif action == "start":
         projects = dict(request.form["projects"])
         utilities.startProjects(projects) 
-        return str("success")
 
     elif action == "stop":
         projects = dict(request.form["projects"])
         utilities.stopProjects(projects)
-        return str("success")
 
     elif action == "restart":
         projects = dict(request.form["projects"])
         utilities.stopProjects(projects)
         utilities.startProjects(projects)
-        return str("success")
 
     elif action == "status":
-        projects = dict(request.form["projects"])
+        projects = data["projects"]
         response = utilities.getStatuses(projects)
-        return response
 
     elif action == "add":
         projects = dict(request.form["projects"])
         utilities.addProjects(projects)
-        return str("success")
 
     elif action == "remove":
         projects = dict(request.form["projects"])
         utilities.removeProjects(projects)
-        return str("success")
+    
+    return jsonify(response)
 
 
 # handler to receive project update information from a Node
@@ -91,22 +88,25 @@ def node_update():
     update_result = "success"
     if update_info != "":
         update_result = "failure"
-
     
     utilities.node_information[node_name]["projects"][project_name]["status"] = project_status
     utilities.node_information[node_name]["projects"][project_name]["project-storage"] = project_disk_usage
     utilities.node_information[node_name]["projects"][project_name]["project-ram"] = project_ram_usage
     utilities.node_information[node_name]["projects"][project_name]["persistent-variables"] = project_persistent_variables
-    utilities.active_projects[project_name]["last-contact"] = datetime.datetime.now().timestamp()
+    
+    timestamp = datetime.datetime.now().timestamp()
+    utilities.active_projects[project_name]["last-contact"] = timestamp
+    utilities.node_information[node_name]["last-contact"] = timestamp
 
     response = {
+        "code": 200,
         "update-result": update_result,
         "update-info": update_info
     }
 
     print("Received update information from node: " + node_name)
 
-    return str(response)
+    return jsonify(response)
 
 
 # handlers for nodes to request their own project information
@@ -121,13 +121,14 @@ def node_status():
     projects = utilities.node_information[node_name]["projects"]
 
     response = {
+        "code": 200,
         "name": node_name,
         "projects": projects
     }
 
     print("Gave status information to node: " + node_name)
 
-    return str(response)
+    return jsonify(response)
 
 
 # handler for nodes to initialize themselves
@@ -139,13 +140,13 @@ def node_initialize():
     storage_available = request.form["storage"]
     ram_available = request.form["ram"]
     
-    response = {}  # POST response from the Manager
+    response = {"code": 1}  # POST response from the Manager
     
     # check password
     if syncopate_password != utilities.settings["server-password"]:
         response["initialization-result"] = "failure"
         response["failure-reasoning"] = "incorrect syncopate password"
-        return str(response)
+        return jsonify(response)
 
     # determine the node name
     current_node_names = utilities.node_information.keys()
@@ -156,7 +157,7 @@ def node_initialize():
     if node_name == "-1":
         response["initialization-result"] = "failure"
         response["failure-reasoning"] = "unable to generate a node name"
-        return str(response)
+        return jsonify(response)
 
     # everything checks out!
     # generate the node
@@ -167,18 +168,21 @@ def node_initialize():
     utilities.node_information[node_name]["ram"] = ram_available
     
     # generate the response
-    response["initialization-result"] = "success"
-    response["name"] = node_name
-    response["access-token"] = utilities.node_information[node_name]["access-token"]
-    print("Registered new node: " + node_name)
-    return str(response)
+    response = {
+        "code": 0,
+        "initialization-result": "success",
+        "name": node_name,
+        "access-token": utilities.node_information[node_name]["access-token"]
+    }
+    print("Registered new node: " + node_name, response)
+    return jsonify(response)
 
 if __name__ == "__main__":
     utilities.getSettings()
     utilities.getProjects()
     manager_thread = threading.Thread(target=utilities.status_check, args=[])
     manager_thread.start()
-    app.logger.disabled = True
-    log = logging.getLogger('werkzeug')
-    log.disabled = True
+    #app.logger.disabled = True
+    #log = logging.getLogger('werkzeug')
+    #log.disabled = True
     app.run()

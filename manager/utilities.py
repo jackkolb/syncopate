@@ -15,9 +15,10 @@ standby_projects = {}
 
 # periodically checks if the nodes are alive, if any are dead start them
 def status_check():
-    global project_information, active_projects
+    global node_information, project_information, active_projects
     while True:
-        #print("checking statuses")
+        timestamp = datetime.datetime.now().timestamp()
+        # check if individual projects are alive
         for project in active_projects.keys():
             # check the timestamp, compare to the timeout
             last_contact = active_projects[project]["last-contact"]
@@ -26,9 +27,10 @@ def status_check():
                 active_projects[project]["status"] = "unborn"
                 stopProjects([project])
                 startProjects([project])
+                last_contact = timestamp
                 continue
 
-            elif datetime.datetime.now().timestamp() > int(last_contact) + int(timeout):
+            elif timestamp > int(last_contact) + int(timeout):
                 print(project + " is dead")
                 active_projects[project]["status"] = "dead"
                 stopProjects([project])
@@ -40,6 +42,15 @@ def status_check():
             active_projects[project]["status"] = "alive"
             project_information[project]["ram-estimate"] = current_ram
             project_information[project]["storage-estimate"] = current_disk
+
+        # check if individual nodes are alive
+        for node in node_information.keys():
+            if timestamp - node_information[node]["last-contact"] > 30:
+                # assume node is dead
+                print("node", node, "is dead")
+                del node_information[node]
+
+
         with open("manager.projects", "w") as projects_file:
             projects_file.write(str(project_information))
         time.sleep(3)
@@ -61,13 +72,13 @@ def getProjects():
         active_projects = project_information
         for project in active_projects.keys():
             active_projects[project]["status"] = "dead"
-            active_projects[project]["last-contact"] = "0"
-            active_projects[project]["timeout"] = "30"
+            active_projects[project]["last-contact"] = 0
+            active_projects[project]["timeout"] = 30
 
             if "ram-estimate" not in project_information.keys():
-                project_information[project]["ram-estimate"] = "1"
+                project_information[project]["ram-estimate"] = 1
             if "storage-estimate" not in project_information.keys():
-                project_information[project]["storage-estimate"] = "1"
+                project_information[project]["storage-estimate"] = 1
     return
 
 
@@ -75,7 +86,7 @@ def stopProjects(projects):
     for project_name in projects:
         for node in node_information.keys():
             if project_name in node_information[node]["projects"]:
-                projects.remove(project_name)
+                del node_information[node]["projects"][project_name]
     return
 
 
@@ -86,14 +97,14 @@ def startProjects(projects):
     # if there are no registered nodes, can't start projects
     if len(node_information.keys()) == 0:
         return
-        
+
     for project_name in projects:
         if project_name not in project_information.keys():
             print("[info] startProjects project name not in project informations")
             continue
 
-        ideal_node = ""
-        print(":::::::::::" + project_name)
+        ideal_node = None
+        print("Starting project", project_name, node_information)
 
         for node_name in node_information.keys():
             ram = int(node_information[node_name]["ram"])
@@ -102,21 +113,26 @@ def startProjects(projects):
                 ram -= int(node_information[node_name]["projects"][project]["project-ram"])
                 disk -= int(node_information[node_name]["projects"][project]["project-storage"])
             if int(project_information[project_name]["ram-estimate"]) < ram and int(project_information[project_name]["storage-estimate"]) < disk:
-                if ideal_node == "":
+                if ideal_node is None:
                     ideal_node = node_name
                 elif ram > int(node_information[ideal_node]["ram"]) and disk > int(node_information[ideal_node]["storage"]):
                     ideal_node = node_name
-        print(node_information)
-        node_information[ideal_node]["projects"][project_name] = project_information[project_name]
         
+        if ideal_node is None:
+            print("no node can be assigned the project", project_name)
+            continue
+        else:
+            node_information[ideal_node]["projects"][project_name] = project_information[project_name]
+            print("Adding project to node", ideal_node)
+
 
 def getStatuses(projects):
     response = {}
     for project_name in projects:
         response[project_name] = "unknown"
-        for node in node_information.keys():
-            if project_name in node["projects"]:
-                response[project_name] = node["projects"][project_name]["status"]
+        for node in node_information:
+            if project_name in node_information[node]["projects"]:
+                response[project_name] = node_information[node]["projects"][project_name]["status"]
     return response
 
 
@@ -196,5 +212,6 @@ def generateBaseNode():
     node["projects"] = {}
     node["storage"] = ""
     node["ram"] = ""
+    node["last-contact"] = datetime.datetime.now().timestamp()
     return node
 
