@@ -30,7 +30,7 @@ def controller():
     action = data["action"]
     response = {"code": 0}
 
-    valid_actions = ["start", "stop", "restart", "status", "add", "remove"]
+    valid_actions = ["start", "stop", "restart", "project-status", "node-status", "add", "remove"]
     if action not in valid_actions:
         response["request-status"] = "failure"
         response["request-information"] = "invalid action"
@@ -48,9 +48,13 @@ def controller():
         utilities.stopProjects(projects)
         utilities.startProjects(projects)
 
-    elif action == "status":
-        projects = data["projects"]
-        response = utilities.getStatuses(projects)
+    elif action == "project-status":
+        projects = data["projects"] if "projects" in data else []
+        response = utilities.getProjectStatuses(projects)
+    
+    elif action == "node-status":
+        projects = data["nodes"] if "nodes" in data else []
+        response = utilities.getNodeStatuses(projects)
 
     elif action == "add":
         projects = dict(request.form["projects"])
@@ -127,6 +131,7 @@ def node_status():
     }
 
     print("Gave status information to node: " + node_name)
+    utilities.node_information[node_name]["last-contact"] = datetime.datetime.now().timestamp()
 
     return jsonify(response)
 

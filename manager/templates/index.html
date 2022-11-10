@@ -11,15 +11,21 @@
     </style>
 
     <body>
-
         <div id="status"></div>
+        <div id="node-information"></div>
 
         <script>
             window.setInterval(() => {
-                postRequest({"access-token": "123abc", "action": "status", "projects": ["simple-project"]})
+                postRequest({"access-token": "123abc", "action": "project-status", "projects": ["simple-project"]})
                 .then(res => res.json())
                 .then(data => {
                     document.getElementById("status").innerHTML = JSON.stringify(data);
+                })
+
+                postRequest({"access-token": "123abc", "action": "node-status", "nodes": []})
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById("node-information").innerHTML = JSON.stringify(data);
                 })
                 
             }, 1000)

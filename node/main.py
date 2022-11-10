@@ -114,7 +114,7 @@ def startProject(project_name):
 def updateManager(project_name):
     project = projects[project_name]
     project_url = project["project-url"]
-    project_status = "Alive" if checkProjectIsAlive(project_name) else "Dead"
+    project_status = "alive" if checkProjectIsAlive(project_name) else "dead"
     project_storage = getProjectStorage(project_name)
     project_variables = getProjectVariables(project_name)
     data = {

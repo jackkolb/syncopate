@@ -44,7 +44,7 @@ def status_check():
             project_information[project]["storage-estimate"] = current_disk
 
         # check if individual nodes are alive
-        for node in node_information.keys():
+        for node in [x for x in node_information.keys()]:
             if timestamp - node_information[node]["last-contact"] > 30:
                 # assume node is dead
                 print("node", node, "is dead")
@@ -126,13 +126,31 @@ def startProjects(projects):
             print("Adding project to node", ideal_node)
 
 
-def getStatuses(projects):
+def getProjectStatuses(projects):
     response = {}
+
+    # if no projects specified, choose all projects
+    if projects == []:
+        for x in node_information:
+            for y in node_information[x]["projects"]:
+                projects.append(node_information[x]["projects"][y]["status"])
+    
     for project_name in projects:
         response[project_name] = "unknown"
         for node in node_information:
             if project_name in node_information[node]["projects"]:
                 response[project_name] = node_information[node]["projects"][project_name]["status"]
+    return response
+
+def getNodeStatuses(nodes):
+    response = {}
+    if nodes == []:
+        nodes = [x for x in node_information]
+
+    for node_name in nodes:
+        response[node_name] = {"status": "does not exist"}
+        if node_name in node_information:
+            response[node_name] = node_information[node_name]
     return response
 
 
