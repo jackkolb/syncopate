@@ -126,7 +126,7 @@ def startProject(project_name):
     git_clone.wait()
     # open the process
     subprocess.Popen(["chmod", "+x", "./projects/" + project_name + "/run.sh"])
-    projects[project_name]["process"] = subprocess.Popen(["sh", "./projects/" + project_name + "/run.sh"], env=projects[project_name]["environment-variables"])
+    projects[project_name]["process"] = subprocess.Popen(["cd", "./projects/" + project_name, ";", "sh", "run.sh"], env=projects[project_name]["environment-variables"])
     print("[info] project started: " + project_name)
 
 # pulls from git to check for updates
